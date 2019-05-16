@@ -21,7 +21,7 @@ class PlanarVisualization{
 				for(int a = 1; a <= 5; a++){
 					gridBorderPoints[i][0] = w/2 - d * dist * cos(a * (PI/6));
 					gridBorderPoints[i][1] = h - d * dist * sin(a * (PI/6));
-					cout << gridBorderPoints[i][0] << " " << gridBorderPoints[i][0] << endl; 
+					//cout << gridBorderPoints[i][0] << " " << gridBorderPoints[i][0] << endl; 
 					i++;
 				}
 			}
@@ -38,11 +38,11 @@ class PlanarVisualization{
 			for(int i = 0; i < NUM_GRID_POINTS; i++){
 				cv::circle(img, cv::Point2f(gridBorderPoints[i][0], gridBorderPoints[i][1]), 5, cv::Scalar(255, 255, 0));
 			}
-			for(int i = 0; i < 5; i++) {
-				cv::line(img, Point(0, i*h/6 + h/6), Point(w, i*h/6 + h/6), Scalar( 120, 0, 120));
+			for(int i = -300; i <= 300; i+=100) {
+				cv::line(img, Point(i + 460, 500 - 10), Point(i + 460, 300 - 10), Scalar( 0, 255, 255));
 			}
-			for(int i = 0; i < 5; i++) {
-				cv::line(img, Point(i*w/6 + w/6, 0), Point(i*w/6 + w/6, h), Scalar( 120, 0, 120));
+			for(int i = 10; i <= 210; i+=100) {
+				cv::line(img, Point(460 - 300, 500 - i), Point(460 + 300, 500 - i), Scalar( 0, 255, 255));
 			}
 		}
 		void getPoint(float &x, float &y, int i){

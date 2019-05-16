@@ -33,6 +33,8 @@ cv::Mat GazeCamera::extractEyeRegion(cv::Point corners[6], cv::Mat in_image, int
 	cv::Point2f small = smallest_point(corners);
 	cv::Point2f large = largest_point(corners);
 
+	// small = small - (cv::Point2f(150, 50) - (large - small) / 2);
+
 	// subtract away the smallest value of the region we are cropping to
 	for(int i = 0; i < 6; i++){
 		corners[i].x -= small.x;
@@ -41,16 +43,16 @@ cv::Mat GazeCamera::extractEyeRegion(cv::Point corners[6], cv::Mat in_image, int
 
 	int w = large.x;
 
-	in_image = in_image(cv::Rect(small.x, small.y, 40, 40));
+	in_image = in_image(cv::Rect(small.x, small.y, 30, 10));
 
 	const cv::Point* corner_list[1] = {corners};
 
-	cv::Mat mask(in_image.rows, in_image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
-	cv::fillPoly(mask, corner_list, &num_points, 1, cv::Scalar(255, 255, 255), 8);
-	cv::Mat result(in_image.rows, in_image.cols, CV_8UC3, cv::Scalar(255,255,255));
-	cv::Mat mask2(in_image.rows, in_image.cols, CV_8UC1, cv::Scalar(0));
-	cv::fillPoly(mask2, corner_list, &num_points, 1, cv::Scalar(255));
-	cv::bitwise_and(in_image, mask, result, mask2);
+	// cv::Mat mask(in_image.rows, in_image.cols, CV_8UC3, cv::Scalar(0, 0, 0));
+	// cv::fillPoly(mask, corner_list, &num_points, 1, cv::Scalar(255, 255, 255), 8);
+	// cv::Mat result(in_image.rows, in_image.cols, CV_8UC3, cv::Scalar(255,255,255));
+	// cv::Mat mask2(in_image.rows, in_image.cols, CV_8UC1, cv::Scalar(0));
+	// cv::fillPoly(mask2, corner_list, &num_points, 1, cv::Scalar(255));
+	// cv::bitwise_and(in_image, mask, result, mask2);
 
 	// subtract away the smallest value of the region we are cropping to
 	for(int i = 0; i < 6; i++){
@@ -58,10 +60,13 @@ cv::Mat GazeCamera::extractEyeRegion(cv::Point corners[6], cv::Mat in_image, int
 		corners[i].y += small.y;
 	}
 
+	cv::Mat result = in_image;
+
 	return result;
 };  
 
 // Following two functions intended for use with Fabian Timm's EyeLike
+// needs and image size
 cv::Rect GazeCamera::findEyeRect(cv::Point corners[6], cv::Mat in_image){
 	cv::Point2f small = smallest_point(corners);
 	cv::Point2f large = largest_point(corners);
@@ -109,7 +114,7 @@ cv::Mat GazeCamera::getNormalizedEye(cv::Mat image, cv::Point3f eyeballCentreLef
 }
 
 // constructor for when you have arguements
-GazeCamera::GazeCamera(vector<string> arguments){
+GazeCamera::GazeCamera(vector<string> arguments, bool record_video, bool grad_tracker){
 	this -> visualizer = new Utilities::Visualizer(true, false, false, false);
 
 	this -> gazeDirectionLeft = cv::Point3f(0, 0, -1);
@@ -118,6 +123,8 @@ GazeCamera::GazeCamera(vector<string> arguments){
 	this -> eyeballCentreRight = cv::Point3f(0, 0, 0);
 
 	this -> successful_step = true;
+	this -> record_video = record_video;
+	this -> grad_tracker = grad_tracker;
 
 	det_parameters = new LandmarkDetector::FaceModelParameters(arguments);
 	face_model = new LandmarkDetector::CLNF(det_parameters->model_location);
@@ -143,12 +150,14 @@ GazeCamera::GazeCamera(vector<string> arguments){
 	cout << "image read" << endl;
 
 	//video recording
-	// this -> video = new cv::VideoWriter("recording.avi",CV_FOURCC('M','J','P','G'),10, cv::Size(640, 480));
+	if(this -> record_video)
+		this -> video = new cv::VideoWriter("recording.avi",CV_FOURCC('M','J','P','G'),10, cv::Size(640, 480));
 
+	// this -> dataFile.open("box_upper_corner.csv", std::ofstream::out | std::ofstream::app);
 }
 
 // constructor for when you just want the webcam referenced by a certain device number
-GazeCamera::GazeCamera(int device_number){
+GazeCamera::GazeCamera(int device_number, bool record_video, bool grad_tracker){
 	this -> visualizer = new Utilities::Visualizer(true, false, false, false);
 
 	this -> gazeDirectionLeft = cv::Point3f(0, 0, -1);
@@ -157,6 +166,8 @@ GazeCamera::GazeCamera(int device_number){
 	this -> eyeballCentreRight = cv::Point3f(0, 0, 0);
 
 	this -> successful_step = true;
+	this -> grad_tracker = grad_tracker;
+	this -> record_video = record_video;
 	this -> device_number = device_number;
 
 	this -> eyeImgNum = 0;
@@ -189,7 +200,8 @@ GazeCamera::GazeCamera(int device_number){
 	cout << "image read" << endl;
 
 	//video recording
-	// this -> video = new cv::VideoWriter("recording.avi",CV_FOURCC('M','J','P','G'),10, cv::Size(640, 480));
+	if(this -> record_video)
+		this -> video = new cv::VideoWriter("recording.avi",CV_FOURCC('M','J','P','G'),10, cv::Size(640, 480));
 };
 
 bool GazeCamera::step(){
@@ -222,15 +234,21 @@ bool GazeCamera::step(){
 			// this -> offsets.push_back(smallest_point(corners));
 			
 			// this -> right_eye_patch = GazeCamera::extractEyeRegion(corners, rgb_image, 6);
-			this -> right_eye_patch = this->rgb_image(GazeCamera::findEyeRect(corners, this -> rgb_image));
+			this -> right_eye_patch = this->rgb_image(GazeCamera::findEyeRect(corners, this -> grayscale_image));
 			cv::imshow("right eye", this -> right_eye_patch);
-			cv::Point2f right_pupil_center_relative = findEyeCenter(this -> grayscale_image, GazeCamera::findEyeRect(corners, this -> rgb_image), "debug");
-			cv::Point2f right_pupil_center = right_pupil_center_relative + smallest_point(corners);
-			cv::circle(this -> rgb_image, right_pupil_center, 3, cv::Scalar(255, 255, 255));
+			cv::Point2f right_pupil_center_relative = findEyeCenter(this -> grayscale_image, GazeCamera::findEyeRect(corners, this -> grayscale_image), "right debug");
+			cv::Point2f ul_corner_r = smallest_point(corners);
+			cv::Point2f right_pupil_center = right_pupil_center_relative + ul_corner_r;
+			// cv::circle(this -> rgb_image, right_pupil_center, 3, cv::Scalar(255, 255, 255));
 
-			// video -> write(rgb_image);
-			GazeAnalysis::EstimateGaze(*(this->face_model), right_pupil_center, this -> gazeDirectionRight, this -> eyeballCentreRight, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, false);
-			// GazeAnalysis::EstimateGaze(*(this->face_model), this -> gazeDirectionRight, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, false, this -> eyeballCentreRight);
+			
+			if(this->record_video)
+				video -> write(rgb_image);
+
+			if(this -> grad_tracker)
+				GazeAnalysis::EstimateGaze(*(this->face_model), right_pupil_center, this -> gazeDirectionRight, this -> eyeballCentreRight, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, false);
+			else
+				GazeAnalysis::EstimateGaze(*(this->face_model), this -> gazeDirectionRight, this -> eyeballCentreRight, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, false);
 
 			// std::cout << this -> gazeDirectionRight << std::endl;
 
@@ -247,14 +265,24 @@ bool GazeCamera::step(){
 			// std::cout << corners[0] << std::endl;
 			
 			// this -> left_eye_patch = GazeCamera::extractEyeRegion(corners, rgb_image, 6);
-			this -> left_eye_patch = this->rgb_image(GazeCamera::findEyeRect(corners, this -> rgb_image));
+			this -> left_eye_patch = this->rgb_image(GazeCamera::findEyeRect(corners, this -> grayscale_image));
 			cv::imshow("left eye", this -> left_eye_patch);
-			cv::Point2f left_pupil_center_relative = findEyeCenter(this -> grayscale_image, GazeCamera::findEyeRect(corners, this -> rgb_image), "debug");
-			cv::Point2f left_pupil_center = left_pupil_center_relative + smallest_point(corners);
-			cv::circle(this -> rgb_image, left_pupil_center, 3, cv::Scalar(255, 255, 255));
+			cv::Point2f left_pupil_center_relative = findEyeCenter(this -> grayscale_image, GazeCamera::findEyeRect(corners, this -> grayscale_image), "left debug");
+			cv::Point2f ul_corner_l = smallest_point(corners);
+			cv::Point2f left_pupil_center = left_pupil_center_relative + ul_corner_l;
+			// cv::circle(this -> rgb_image, left_pupil_center, 3, cv::Scalar(255, 255, 255));
 
-			GazeAnalysis::EstimateGaze(*(this->face_model), left_pupil_center, this -> gazeDirectionLeft, this -> eyeballCentreLeft, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, true);
-			// GazeAnalysis::EstimateGaze(*(this->face_model), this -> gazeDirectionLeft, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, true, this -> eyeballCentreLeft);
+			if(this -> grad_tracker)
+				GazeAnalysis::EstimateGaze(*(this->face_model), left_pupil_center, this -> gazeDirectionLeft, this -> eyeballCentreLeft, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, true);
+			else
+				GazeAnalysis::EstimateGaze(*(this->face_model), this -> gazeDirectionLeft, this -> eyeballCentreLeft, this->sequence_reader.fx, this->sequence_reader.fy, this->sequence_reader.cx, this->sequence_reader.cy, true);
+
+			// dataFile << ul_corner_l.x << ","<< ul_corner_l.y << "," << ul_corner_r.x << "," << ul_corner_r.y << endl;
+			// cv::imwrite("extracted_eye_boxes/" + to_string(eyeImgNum) + "_l.png", this -> left_eye_patch);
+			// cv::imwrite("extracted_eye_boxes/" + to_string(eyeImgNum) + "_r.png", this -> right_eye_patch);
+
+			if(this -> record_video)
+
 
 			this -> eyeImgNum++;
 
@@ -306,8 +334,10 @@ GazeCamera::~GazeCamera(){
 	std::cout << "Gaze Camera Closed" << std::endl;
 	delete this -> det_parameters;
 	delete this -> face_model;
-	// this -> video -> release();
-	// delete this -> video;
+	if(this->record_video){
+		this -> video -> release();
+		delete this -> video;
+	}
 
 	//save the offsets of the created images to a file
 	// std::ofstream offset_file;
@@ -319,4 +349,4 @@ GazeCamera::~GazeCamera(){
 	// }
 
 	// offset_file.close();
-};
+};	

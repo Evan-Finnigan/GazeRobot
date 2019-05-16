@@ -52,15 +52,15 @@ using namespace std;
 
 float h = 500;
 float w = 920; 
-// cv::Mat rot =  (cv::Mat_<float>(3,3) <<  9.9998547461360932e-01, 1.1488672120774735e-03,
-//           5.2659914473014123e-03, 5.0478745734227936e-03,
-//           -5.4210269987694815e-01, -8.4029707945964827e-01,
-//           1.8893184181153632e-03, 8.4031145588421707e-01,
-//           -5.4210062496335720e-01);
-// cv::Mat trans =  (cv::Mat_<float>(3,1) <<  -1.2006947750366847e+02, 1.5818949386385434e+01, 4.2130911546646030e+02 );
-cv::Mat rot =  (cv::Mat_<float>(3,3) << .99, -.008, -.009, -.012, -.93, -.34, -.0061, -.35, -.93);
-cv::Mat trans =  (cv::Mat_<float>(3,1) << -100,200,530);
-cv::Mat shift =  (cv::Mat_<float>(3,1) << 120,-120,250);
+cv::Mat rot =  (cv::Mat_<float>(3,3) <<  .99, .02, -.05,
+                                          0, -.89, -.44,
+                                          -.053, .44, -.89);
+
+cv::Mat trans =  (cv::Mat_<float>(3,1) <<  -87, 40,  279);
+cv::Mat shift =  (cv::Mat_<float>(3,1) << 130,-270,270);
+// cv::Mat rot =  (cv::Mat_<float>(3,3) << .99, -.008, -.009, -.012, -.93, -.34, -.0061, -.35, -.93);
+// cv::Mat trans =  (cv::Mat_<float>(3,1) << -100,200,530);
+// cv::Mat shift =  (cv::Mat_<float>(3,1) << 120,-120,250);
 geo2prob g2 = geo2prob(rot, trans, shift);
 pr p = pr();
 
@@ -100,14 +100,23 @@ vector<string> get_arguments(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-	int collecting = 0; 
+	// int collecting = 0; 
+	int grad_tracker = -1;
 
 	vector<string> arguments = get_arguments(argc, argv);
 
-	if (arguments.size() == 5 || arguments.size() == 4)
-		collecting = 1;  
+	// if (arguments.size() == 5 || arguments.size() == 4)
+	// 	collecting = 1;  
+
+
+	for(int i = 0; i != arguments.size(); i++){
+		if(arguments[i].compare("-grad_tracker") == 0)
+			grad_tracker = i;
+	}
+	if(grad_tracker > -1)
+		arguments.erase(arguments.begin() + grad_tracker);
   
-	GazeCamera cam1(arguments);
+	GazeCamera cam1(arguments, false, grad_tracker > -1 ? true : false);
 
 	Mat out_image =  Mat::zeros( h, w, CV_8UC3 );
 	namedWindow( "Display window", WINDOW_AUTOSIZE );// Create a window for display.  
@@ -119,7 +128,7 @@ int main(int argc, char **argv)
 
 	PlanarVisualization pv(920, 500, 200);
 
-	datasaver ds(&cam1, arguments, &pv, collecting, &g2);
+	// datasaver ds(&cam1, arguments, &pv, collecting, &g2);
 
 	// std::shared_ptr<torch::jit::script::Module> net = torch::jit::losad("model.pt");
 
@@ -146,11 +155,13 @@ int main(int argc, char **argv)
            			Scalar( 255, 255, 255),
            			2,
            			8);
+
+		// cout << x << " " << z << endl;
 	
-		line(out_image, Point(460 - 225, 500 - 100), Point(460 + 225, 500 - 100), Scalar( 0, 255, 255));
-    	line(out_image, Point(460 - 225, 500 - 400), Point(460 + 225, 500 - 400), Scalar( 0, 255, 255));
-    	line(out_image, Point(460 + 225, 500 - 100), Point(460 + 225, 500 - 400), Scalar( 0, 255, 255));
-    	line(out_image, Point(460 - 225, 500 - 100), Point(460 - 225, 500 - 400), Scalar( 0, 255, 255));
+		// line(out_image, Point(460 - 300, 500 -10), Point(460 + 300, 500-10), Scalar( 0, 255, 255));
+  //   	line(out_image, Point(460 - 300, 500 - 200), Point(460 + 300, 500 - 200), Scalar( 0, 255, 255));
+  //   	line(out_image, Point(460 + 300, 500 -10), Point(460 + 300, 500 - 200), Scalar( 0, 255, 255));
+  //   	line(out_image, Point(460 - 300, 500-10), Point(460 - 300, 500 - 200), Scalar( 0, 255, 255));
 		d[0] = x;
 		d[1] = z; 
 		int valid = p.eval(x,y,z, d);
@@ -189,16 +200,24 @@ int main(int argc, char **argv)
 		if (cam1.character_press == 'c') {
 			string to_send = "C\r\n";
 			serialport_write(fd, to_send.c_str());
+			cout << "calibrate" << endl;
 		} else if (cam1.character_press == 'e' ) {
-			if (x < 200 && x > -200 && z > 0 && z < 200){
-				string to_send = "U," + to_string(int(x)) + "," + to_string(int(z)) + "," + to_string(5) + "," + "0.1\r\n";
-				cout << to_send << endl; 
-				serialport_write(fd, to_send.c_str());
-			}
+			if (x > 300)
+				x = 300;
+			else if (x < -300)
+				x = -300;
+			
+			if (z < 10)
+				z = 10;
+			else if (z > 200)
+				z = 200;
+			string to_send = "U," + to_string(int(x)) + "," + to_string(int(z)) + "," + to_string(5) + "," + "0.1\r\n";
+			cout << to_send << endl; 
+			serialport_write(fd, to_send.c_str());
 		}
 
 
-		ds.cycle();
+		// ds.cycle();
 
 		pv.drawGrid(out_image);
 		imshow( "Display window", out_image);
@@ -228,7 +247,7 @@ int main(int argc, char **argv)
 	// txtOut.close();
 	// txtOutl.close();
 	// txtOutr.close();
-	ds.close();
+	// ds.close();
 
 	return 0;
 }

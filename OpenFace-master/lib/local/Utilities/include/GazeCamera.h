@@ -44,6 +44,8 @@ class GazeCamera {
 		int device_number;
 		std::vector<cv::Point2f> offsets;
 		int eyeImgNum;
+		bool record_video;
+		bool grad_tracker;
 
 		std::ofstream dataFile;
 
@@ -71,8 +73,8 @@ class GazeCamera {
 		bool cont;
 		char character_press;
 
-		GazeCamera(int device_number);
-		GazeCamera(vector<string> arguments);
+		GazeCamera(int device_number, bool record_video = false, bool grad_tracker = false);
+		GazeCamera(vector<string> arguments, bool record_video = false, bool grad_tracker = false);
 
 		bool step();
 
