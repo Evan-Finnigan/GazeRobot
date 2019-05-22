@@ -134,7 +134,8 @@ int main(int argc, char **argv)
 
 	// setup the serial connection
 	int fd = serialport_init("/dev/cu.usbmodem1411", 115200);
-	serialport_flush(fd);
+	if(fd != -1)
+		serialport_flush(fd);
 
 	INFO_STREAM("Starting tracking");
 	while (cam1.step() == true) // this is not a for loop as we might also be reading from a webcam
@@ -199,8 +200,11 @@ int main(int argc, char **argv)
 
 		if (cam1.character_press == 'c') {
 			string to_send = "C\r\n";
-			serialport_write(fd, to_send.c_str());
 			cout << "calibrate" << endl;
+			if(fd == -1)
+				cout << "Serial port not open" << endl;
+			else
+				serialport_write(fd, to_send.c_str());
 		} else if (cam1.character_press == 'e' ) {
 			if (x > 300)
 				x = 300;
@@ -213,7 +217,10 @@ int main(int argc, char **argv)
 				z = 200;
 			string to_send = "U," + to_string(int(x)) + "," + to_string(int(z)) + "," + to_string(5) + "," + "0.1\r\n";
 			cout << to_send << endl; 
-			serialport_write(fd, to_send.c_str());
+			if(fd == -1)
+				cout << "Serial port not open" << endl << endl;
+			else
+				serialport_write(fd, to_send.c_str());
 		}
 
 
@@ -248,6 +255,11 @@ int main(int argc, char **argv)
 	// txtOutl.close();
 	// txtOutr.close();
 	// ds.close();
+
+	if(fd != -1){
+		serialport_close(fd);
+		cout << "Serial port closed" << endl;
+	}
 
 	return 0;
 }
